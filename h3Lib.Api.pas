@@ -191,9 +191,9 @@ type
   /// <summary>represents latitude/longitude in radians</summary>
   Th3LatLng = record
     /// <summary>latitude in radians</summary>
-    lat_rad: Double;
+    LatitudeInRadians: Double;
     /// <summary>longitude in radians</summary>
-    lng_rad: Double;
+    LongitudeInRadians: Double;
     class function Create(const lat,lng: double): Th3LatLng; static;
     function Latitude: Double;
     function Longitude: Double;
@@ -203,27 +203,27 @@ type
   /// <remarks>cell boundary in latitude/longitude</remarks>
   Th3CellBoundary = record
     /// <summary>number of vertices</summary>
-    numVerts: Integer;
+    NumVerts: Integer;
     /// <summary>vertices in ccw order</summary>
-    verts: array [0..9] of Th3LatLng;
+    Verts: array [0..9] of Th3LatLng;
   end;
 
   /// <summary>Th3GeoLoop</summary>
   /// <remarks>similar to Th3CellBoundary, but requires more alloc work</remarks>
   Th3GeoLoop = record
-    numVerts: Integer;
-    verts: Ph3LatLng;
+    NumVerts: Integer;
+    Verts: Ph3LatLng;
   end;
 
   /// <summary>Th3GeoPolygon</summary>
   /// <remarks>Simplified core of GeoJSON Polygon coordinates definition</remarks>
   Th3GeoPolygon = record
     /// <summary>exterior boundary of the polygon</summary>
-    Th3GeoLoop: Th3GeoLoop;
+    GeoLoop: Th3GeoLoop;
     /// <summary>number of elements in the array pointed to by holes</summary>
-    numHoles: Integer;
+    NumHoles: Integer;
     /// <summary>interior boundaries (holes) in the polygon</summary>
-    holes: Ph3GeoLoop;
+    Holes: Ph3GeoLoop;
   end;
 
   /// <summary>Th3GeoMultiPolygon</summary>
@@ -677,18 +677,18 @@ end;
 
 class function Th3LatLng.Create(const lat, lng: double): Th3LatLng;
 begin
-  Result.lat_rad := DegToRad(lat);
-  Result.lng_rad := DegToRad(lng);
+  Result.LatitudeInRadians := DegToRad(lat);
+  Result.LongitudeInRadians := DegToRad(lng);
 end;
 
 function Th3LatLng.Latitude: Double;
 begin
-  Result := RadToDeg(lat_rad);
+  Result := RadToDeg(LatitudeInRadians);
 end;
 
 function Th3LatLng.Longitude: Double;
 begin
-  Result := RadToDeg(lng_rad);
+  Result := RadToDeg(LongitudeInRadians);
 end;
 
 constructor Th3Api.Create(const ADllPath: string);
