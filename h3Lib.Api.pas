@@ -9,11 +9,11 @@ uses
 
 const
 {$IF Defined(WIN32)}
-  h3dll = 'h3.dll';
+  h3dllDefname = 'h3.dll';
 {$ELSEIF Defined(WIN64)}
-  h3dll = 'h364.dll';
+  h3dllDefname = 'h364.dll';
 {$ELSE}
-  h3dll = 'h3';
+  h3dllDefname = 'h3';
   {$MESSAGE Warn 'h3api - Unsupported platform'}
 {$ENDIF}
   H3_NULL = 0;
@@ -923,7 +923,7 @@ begin
   if Fh3DllPath.IsEmpty then
     Fh3DllPath := GetEnvironmentVariable(H3_DLL_PATH);
   if Fh3DllPath.IsEmpty then
-    Fh3DllPath := h3dll;
+    Fh3DllPath := h3dllDefname;
 
   if not FileExists(Fh3DllPath) then
     raise EFileNotFoundException.CreateRes(@rsErrorH3DllNotFound,Fh3DllPath);
