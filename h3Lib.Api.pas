@@ -11,9 +11,9 @@ const
 {$IF Defined(WIN32)}
   h3dllDefname = 'h3.dll';
 {$ELSEIF Defined(WIN64)}
-  h3dllDefname = 'h364.dll';
+  h3dll = 'h364.dll';
 {$ELSE}
-  h3dllDefname = 'h3';
+  h3dll = 'h3';
   {$MESSAGE Warn 'h3api - Unsupported platform'}
 {$ENDIF}
   H3_NULL = 0;
@@ -22,6 +22,90 @@ const
   H3_VERSION_PATCH = 0;
   MAX_CELL_BNDRY_VERTS = 10;
   H3_DLL_PATH = 'H3_DLL_PATH';
+
+  {$region '  constants for bitwise manipulation of TH3Index's.'}
+  ///<summary>Minimal resolution level of h3</summary>
+  H3_RES_MIN = 0;
+  ///<summary>Maximum resolution level of h3</summary>
+  H3_RES_MAX = 15;
+  ///<summary>The number of bits in an H3 index.</summary>
+  H3_NUM_BITS = 64;
+  ///<summary>The bit offset of the max resolution digit in an H3 index</summary>
+  H3_MAX_OFFSET = 63;
+  ///<summary>The bit offset of the mode in an H3 index.</summary>
+  H3_MODE_OFFSET = 59;
+  ///<summary>The bit offset of the base cell in an H3 index.</summary>
+  H3_BC_OFFSET = 45;
+  ///<summary>The bit offset of the resolution in an H3 index.</summary>
+  H3_RES_OFFSET = 52;
+  ///<summary>The bit offset of the reserved bits in an H3 index.</summary>
+  H3_RESERVED_OFFSET = 56;
+  ///<summary>The number of bits in a single H3 resolution digit.</summary>
+  H3_PER_DIGIT_OFFSET = 3;
+  ///<summary>1 in the highest bit, 0's everywhere else.</summary>
+  H3_HIGH_BIT_MASK = UInt64(1) shl H3_MAX_OFFSET;
+  ///<summary> 0 in the highest bit, 1's everywhere else.</summary>
+  H3_HIGH_BIT_MASK_NEGATIVE = not H3_HIGH_BIT_MASK;
+  ///<summary>1's in the 4 mode bits, 0's everywhere else.</summary>
+  H3_MODE_MASK = UInt64(H3_RES_MAX) shl H3_MODE_OFFSET;
+  ///<summary>0's in the 4 mode bits, 1's everywhere else.</summary>
+  H3_MODE_MASK_NEGATIVE = not H3_MODE_MASK;
+  ///<summary>1's in the 7 base cell bits, 0's everywhere else.</summary>
+  H3_BC_MASK = UInt64(127) shl H3_BC_OFFSET;
+  ///<summary>0's in the 7 base cell bits, 1's everywhere else.</summary>
+  H3_BC_MASK_NEGATIVE = not H3_BC_MASK;
+  ///<summary>1's in the 4 resolution bits, 0's everywhere else.</summary>
+  H3_RES_MASK = UInt64(H3_RES_MAX) shl H3_RES_OFFSET;
+  ///<summary>0's in the 4 resolution bits, 1's everywhere else.</summary>
+  H3_RES_MASK_NEGATIVE = not H3_RES_MASK;
+  ///<summary>1's in the 3 bits of res 15 digit bits, 0's everywhere else.</summary>
+  H3_DIGIT_MASK = UInt64(7);
+  ///<summary>0's in the 7 base cell bits, 1's everywhere else.</summary>
+  H3_DIGIT_MASK_NEGATIVE = not H3_DIGIT_MASK;
+  ///<summary>1's in the 3 reserved bits, 0's everywhere else.</summary>
+  H3_RESERVED_MASK = H3_DIGIT_MASK shl H3_RESERVED_OFFSET;
+  ///<summary>0's in the 3 reserved bits, 1's everywhere else.</summary>
+  H3_RESERVED_MASK_NEGATIVE = not H3_RESERVED_MASK;
+  ///<summary>
+  /// H3 index with mode 0, res 0, base cell 0, and 7 for all index digits.
+  /// Typically used to initialize the creation of an H3 cell index, which
+  /// expects all direction digits to be 7 beyond the cell's resolution.
+  ///</summary>
+  H3_INIT = UInt64(35184372088831);
+  // The number of H3 base cells
+  H3_NUM_BASE_CELLS = 122;
+
+  ///H3 cell index modes
+  H3_CELL_MODE = 1;
+  H3_DIRECTEDEDGE_MODE = 2;
+  H3_EDGE_MODE = 3;
+  H3_VERTEX_MODE = 4;
+  {$endregion}
+
+  {$region 'H3 digit representing ijk+ axes direction.'}
+  ///<summary>H3 digit in center.</summary>
+  H3_DIRECTION_CENTER_DIGIT = 0;
+  ///<summary>H3 digit in k-axes direction.</summary>
+  H3_DIRECTION_K_AXES_DIGIT = 1;
+  ///<summary>H3 digit in j-axes direction.</summary>
+  H3_DIRECTION_J_AXES_DIGIT = 2;
+  ///<summary>H3 digit in j = k direction.</summary>
+  H3_DIRECTION_JK_AXES_DIGIT = H3_DIRECTION_J_AXES_DIGIT or H3_DIRECTION_K_AXES_DIGIT;
+  ///<summary>H3 digit in i-axes direction.</summary>
+  H3_DIRECTION_I_AXES_DIGIT = 4;
+  ///<summary>H3 digit in i = k direction.</summary>
+  H3_DIRECTION_IK_AXES_DIGIT =  H3_DIRECTION_I_AXES_DIGIT or H3_DIRECTION_K_AXES_DIGIT;
+  ///<summary>H3 digit in i = j direction.</summary>
+  H3_DIRECTION_IJ_AXES_DIGIT = H3_DIRECTION_I_AXES_DIGIT or H3_DIRECTION_J_AXES_DIGIT;
+  H3_DIRECTION_MIN = H3_DIRECTION_CENTER_DIGIT;
+  H3_DIRECTION_MAX = H3_DIRECTION_IJ_AXES_DIGIT;
+  ///<summary>H3 digit in the invalid direction.</summary>
+  H3_INVALID_DIGIT = 7;
+  ///<summary>Valid digits will be less than this value. Same value as INVALID_DIGIT.</summary>
+  H3_NUM_DIGITS = H3_INVALID_DIGIT;
+  ///<summary>Child digit which is skipped for pentagons.</summary>
+  H3_PENTAGON_SKIPPED_DIGIT = H3_DIRECTION_K_AXES_DIGIT;
+  {$endregion}
 
 type
   // Forward declarations
@@ -37,10 +121,38 @@ type
 
   /// <summary>Identifier for an object (cell, edge, etc) in the H3 system.</summary>
   /// <remarks>The Th3Index fits within a 64-bit unsigned integer.</remarks>
-  Th3Index = UInt64;
   Ph3Index = ^Th3Index;
+  Th3Index = UInt64;
+
+  Th3IndexHelper = record helper for Th3Index
+  private
+    function GetResolution: Integer;
+    procedure SetResolution(Value: Integer);
+    function GetReservedBits: Integer;
+    function GetBaseCell: Integer;
+    procedure SetBaseCell(Value: Integer);
+    function GetDigit(AResolution: Integer): Integer;
+    procedure SetDigit(AResolution, AValue: Integer);
+    function GetCellMode: Integer;
+    procedure SetCellMode(AMode: Integer);
+  public
+    /// <summary>Base cell of h3.integer digit (0-122).</summary>
+    property BaseCell: Integer read GetBaseCell write SetBaseCell;
+    /// <summary>digit corresponding to a unit vector or the zero vector of h3 in ijk coordinates. integer (0-7).</summary>
+    property Digit[Resolution: Integer]: Integer read GetDigit write SetDigit;
+    /// <summary>Gets the integer mode of h3.</summary>
+    property CellMode: Integer read GetCellMode write SetCellMode;
+    /// <summary>Gets the integer resolution of h3.</summary>
+    property Resolution: Integer read GetResolution write SetResolution;
+    property ReservedBits: Integer read GetReservedBits;
+  end;
+
+
   /// <summary>Result code (success or specific error) from an H3 operation</summary>
   Th3Error = UInt32;
+  Th3ErrorHelper = record helper for Th3Error
+    function Succeed: Boolean;
+  end;
 
   Th3ErrorCodes = (
     /// <summary>Success (no error)</summary>
@@ -171,7 +283,7 @@ type
     /// <returns>
     ///   true on success, another value otherwise.
     /// </returns>
-    function LatLngToCell(const Lat,Lng: Double; Resolution: Integer; var h: Th3Index): LongBool;
+    function LatLngToCell(const Lat,Lng: Double; Resolution: Integer; var h: Th3Index): Boolean;
     /// <summary>
     ///   Determines the spherical coordinates of the center point of an H3 index.
     /// </summary>
@@ -184,7 +296,7 @@ type
     /// <param name="Lng">
     ///   longitude of the H3 cell center.
     /// </param>
-    function CellToLatLng(const h: Th3Index; var Lat,Lng: Double): LongBool;
+    function CellToLatLng(const h: Th3Index; var Lat,Lng: Double): Boolean;
     /// <summary>
     ///   Determines the cell boundary in spherical coordinates for an H3 index.
     /// </summary>
@@ -194,8 +306,9 @@ type
     /// <param name="CellBoundary">
     ///   The boundary of the H3 cell in spherical coordinates.
     /// </param>
-    function CellToBoundary(const h: Th3Index;  var CellBoundary: TArray<Th3LatLng>): LongBool;
+    function CellToBoundary(const h: Th3Index;  var CellBoundary: TArray<Th3LatLng>): Boolean;
     {$endregion}
+    function CompactCells(const Source: TArray<Th3Index>; var Compacted: TArray<Th3Index>): Boolean;
   end;
 
   h3Error = class(Exception)
@@ -388,18 +501,19 @@ type
     /// <param name="CellBoundary">
     ///   The boundary of the H3 cell in spherical coordinates.
     /// </param>
-    function CellToBoundary(const h: Th3Index;  var CellBoundary: TArray<Th3LatLng>): LongBool; overload;
+    function CellToBoundary(const h: Th3Index;  var CellBoundary: TArray<Th3LatLng>): Boolean; overload;
     function cellToCenterChild(h: Th3Index; childRes: Integer; child: Ph3Index): Th3Error;
     function cellToChildPos(child: Th3Index; parentRes: Integer; pRetVal: PInt64): Th3Error;
     function cellToChildren(h: Th3Index; childRes: Integer; children: Ph3Index): Th3Error;
     function cellToChildrenSize(h: Th3Index; childRes: Integer; pRetVal: PInt64): Th3Error;
-    function CellToLatLng(const h: Th3Index; var Lat,Lng: Double): LongBool;
+    function CellToLatLng(const h: Th3Index; var Lat,Lng: Double): Boolean;
     function cellToLocalIj(origin: Th3Index; h3: Th3Index; mode: UInt32; pRetVal: Ph3CoordIJ): Th3Error;
     function cellToParent(h: Th3Index; parentRes: Integer; parent: Ph3Index): Th3Error;
     function cellToVertex(origin: Th3Index; vertexNum: Integer; pRetVal: Ph3Index): Th3Error;
     function cellToVertexes(origin: Th3Index; vertexes: Ph3Index): Th3Error;
     function childPosToCell(childPos: Int64; parent: Th3Index; childRes: Integer; child: Ph3Index): Th3Error;
-    function compactCells(const h3Set: Ph3Index; compactedSet: Ph3Index; const numHexes: Int64): Th3Error;
+    function compactCells(const h3Set: Ph3Index; compactedSet: Ph3Index; const numHexes: Int64): Th3Error; overload;
+    function CompactCells(const Source: TArray<Th3Index>; var Compacted: TArray<Th3Index>): Boolean; overload;
     function degsToRads(degrees: Double): Double;
     procedure destroyLinkedMultiPolygon(polygon: Ph3LinkedGeoPolygon);
     function directedEdgeToBoundary(edge: Th3Index; gb: Ph3CellBoundary): Th3Error;
@@ -438,7 +552,7 @@ type
     function isValidCell(h: Th3Index): Integer;
     function isValidDirectedEdge(edge: Th3Index): Integer;
     function isValidVertex(vertex: Th3Index): Integer;
-    function LatLngToCell(const Lat,Lng: Double; Resolution: Integer; var h: Th3Index): LongBool;
+    function LatLngToCell(const Lat,Lng: Double; Resolution: Integer; var h: Th3Index): Boolean;
     function localIjToCell(origin: Th3Index; const ij: Ph3CoordIJ; mode: UInt32; pRetVal: Ph3Index): Th3Error;
     function maxFaceCount(h3: Th3Index; pRetVal: PInteger): Th3Error;
     function maxGridDiskSize(k: Integer; pRetVal: PInt64): Th3Error;
@@ -449,6 +563,7 @@ type
     function radsToDegs(radians: Double): Double;
     function res0CellCount(): Integer;
     function stringToH3(const str: string; var cell: Th3Index): Th3Error;
+    function Succeeded(Err: Th3Error): Boolean;
     function uncompactCells(const compactedSet: Ph3Index; const numCompacted: Int64; outSet: Ph3Index; const numOut: Int64; const res: Integer): Th3Error;
     function uncompactCellsSize(const compactedSet: Ph3Index; const numCompacted: Int64; const res: Integer; pRetVal: PInt64): Th3Error;
     function vertexToLatLng(vertex: Th3Index; var lat,lng: double): Th3Error;
@@ -463,6 +578,100 @@ resourcestring
   rsErrorH3MethodUnavaible = '%s - %s method unavailable';
 
 implementation
+
+{$region '  Th3ErrorHelper'}
+{ Th3ErrorHelper }
+
+function Th3ErrorHelper.Succeed: Boolean;
+begin
+ Result := Self = Th3Error(Th3ErrorCodes.E_SUCCESS);
+end;
+{$endregion}
+
+{$region '  Th3IndexHelper'}
+{ Th3IndexHelper }
+
+function Th3IndexHelper.GetBaseCell: Integer;
+// #define H3_GET_BASE_CELL(h3) ((int)((((h3)&H3_BC_MASK) >> H3_BC_OFFSET)))
+begin
+  Result := Integer((Self and H3_BC_MASK) shr H3_BC_OFFSET);
+end;
+
+function Th3IndexHelper.GetDigit(AResolution: Integer): Integer;
+(*
+#define H3_GET_INDEX_DIGIT(h3, res) \
+    ((Direction)((((h3) >> ((MAX_H3_RES - (res)) * H3_PER_DIGIT_OFFSET)) & H3_DIGIT_MASK)))
+*)
+begin
+  AResolution := EnsureRange(AResolution,H3_RES_MIN,H3_RES_MAX);
+  Result := (Self shl ((H3_RES_MAX - AResolution)*H3_PER_DIGIT_OFFSET)) and H3_DIGIT_MASK;
+  Result := EnsureRange(Result, H3_DIRECTION_MIN, H3_INVALID_DIGIT);
+end;
+
+function Th3IndexHelper.GetCellMode: Integer;
+// #define H3_GET_MODE(h3) ((int)((((h3)&H3_MODE_MASK) >> H3_MODE_OFFSET)))
+begin
+  Result := Integer((Self and H3_MODE_MASK) shr H3_MODE_OFFSET);
+end;
+
+function Th3IndexHelper.GetReservedBits: Integer;
+(*
+#define H3_GET_RESERVED_BITS(h3) \
+    ((int)((((h3)&H3_RESERVED_MASK) >> H3_RESERVED_OFFSET)))
+*)
+begin
+  Result := Integer((Self and H3_RESERVED_MASK) shr H3_RESERVED_OFFSET);
+end;
+
+function Th3IndexHelper.GetResolution: Integer;
+// #define H3_GET_RESOLUTION(h3) ((int)((((h3)&H3_RES_MASK) >> H3_RES_OFFSET)))
+begin
+  Result := Integer((Self and H3_RES_MASK) shr H3_RES_OFFSET);
+end;
+procedure Th3IndexHelper.SetBaseCell(Value: Integer);
+(*
+#define H3_SET_BASE_CELL(h3, bc) \
+    (h3) = (((h3)&H3_BC_MASK_NEGATIVE) | (((uint64_t)(bc)) << H3_BC_OFFSET))
+*)
+begin
+  Value := EnsureRange(Value,0,H3_NUM_BASE_CELLS);
+  Self := (Self and H3_BC_MASK_NEGATIVE) or (Uint64(Value) shl H3_BC_OFFSET);
+end;
+
+procedure Th3IndexHelper.SetCellMode(AMode: Integer);
+(*
+#define H3_SET_MODE(h3, v) \
+    (h3) = (((h3)&H3_MODE_MASK_NEGATIVE) | (((uint64_t)(v)) << H3_MODE_OFFSET))
+*)
+begin
+  AMode := EnsureRange(AMode, H3_CELL_MODE,H3_VERTEX_MODE);
+  Self := (Self and H3_MODE_MASK_NEGATIVE) or (Uint64(AMode) shl H3_MODE_OFFSET);
+end;
+
+procedure Th3IndexHelper.SetDigit(AResolution, AValue: Integer);
+(*
+#define H3_SET_INDEX_DIGIT(h3, res, digit)                                  \
+    (h3) = (((h3) & ~((H3_DIGIT_MASK                                        \
+                       << ((MAX_H3_RES - (res)) * H3_PER_DIGIT_OFFSET)))) | \
+            (((uint64_t)(digit))                                            \
+             << ((MAX_H3_RES - (res)) * H3_PER_DIGIT_OFFSET)))
+*)
+begin
+  // Self := (Self and not (H3_DIGIT_MASK shl ((H3_RES_MAX - (AResolution)) * H3_PER_DIGIT_OFFSET))) or Uint64(AValue) shl ((H3_RES_MAX - (AValue)) * H3_PER_DIGIT_OFFSET);
+  AResolution := (H3_RES_MAX - EnsureRange(AResolution,H3_RES_MIN,H3_RES_MAX)) * H3_PER_DIGIT_OFFSET;
+  Self := (Self and not H3_DIGIT_MASK shl AResolution) or (Uint64(AValue) shl AResolution)
+end;
+
+procedure Th3IndexHelper.SetResolution(Value: Integer);
+//#define H3_SET_RESOLUTION(h3, res) \
+//    (h3) = (((h3)&H3_RES_MASK_NEGATIVE) | (((uint64_t)(res)) << H3_RES_OFFSET))
+begin
+  Value := EnsureRange(Value,H3_RES_MIN,H3_RES_MAX);
+  Self := (Self and H3_RES_MASK_NEGATIVE) or (UInt64(Value) shl H3_RES_OFFSET);
+end;
+{$endregion}
+
+{$region '  Th3LatLng'}
 
 { Th3LatLng }
 
@@ -565,22 +774,18 @@ begin
   Result := FcellToBoundary(h,gp);
 end;
 
-function Th3Api.cellToBoundary(const h: Th3Index; var CellBoundary: TArray<Th3LatLng>): LongBool;
-var gp: Th3CellBoundary; retVal: Th3Error; i: integer;
+function Th3Api.cellToBoundary(const h: Th3Index; var CellBoundary: TArray<Th3LatLng>): Boolean;
+var gp: Th3CellBoundary; i: integer;
 begin
-  retVal := cellToBoundary(h,@gp);
-  if retVal = Th3Error(Th3Errorcodes.E_SUCCESS) then
+  Result := cellToBoundary(h,@gp).Succeed;
+  if Result then
   begin
-    Result := True;
     SetLength(CellBoundary, gp.numVerts);
     for i := 0 to gp.numVerts -1 do
       CellBoundary[i] := gp.verts[i];
   end
   else
-  begin
-    Result := LongBool(retVal);
     CellBoundary := nil;
-  end;
 end;
 
 function Th3Api.cellToCenterChild(h: Th3Index; childRes: Integer; child: Ph3Index): Th3Error;
@@ -607,12 +812,12 @@ begin
   Result := FcellToChildrenSize(h,childRes,pRetVal);
 end;
 
-function Th3Api.CellToLatLng(const h: Th3Index; var Lat,Lng: Double): LongBool;
-var g: Th3LatLng; retVal: Th3Error;
+function Th3Api.CellToLatLng(const h: Th3Index; var Lat,Lng: Double): Boolean;
+var g: Th3LatLng;
 begin
   CheckMethod(@@FcellToLatLng);
-  retval := FcellToLatLng(h,@g);
-  if retVal = Th3Error(TH3ErrorCodes.E_SUCCESS) then
+  Result := FcellToLatLng(h,@g).Succeed;
+  if Result then
   begin
     Result := True;
     Lat := g.Latitude;
@@ -620,7 +825,6 @@ begin
   end
   else
   begin
-    Result := LongBool(retVal);
     Lat := Lat.NaN;
     Lng := Lat;
   end;
@@ -661,6 +865,19 @@ function Th3Api.childPosToCell(childPos: Int64; parent: Th3Index; childRes: Inte
 begin
   CheckMethod(@@FchildPosToCell);
   Result := FchildPosToCell(childPos,parent,childRes,child);
+end;
+
+function Th3Api.CompactCells(const Source: TArray<Th3Index>; var Compacted: TArray<Th3Index>): Boolean;
+var compactedSize: Int64;
+begin
+{$IFOPT R+}{$DEFINE RANGEON}{$R-}{$ELSE}{$UNDEF RANGEON}{$ENDIF}
+  compactedSize := Length(Source);
+  Result := compactedSize > 0;
+  Setlength(Compacted,compactedSize);
+  Result := Result and compactCells(@Source[0],@Compacted[0],compactedSize).Succeed;
+  if not Result then
+    Compacted := nil;
+{$IFDEF RANGEON}{$R+}{$UNDEF RANGEON}{$ENDIF}
 end;
 
 function Th3Api.compactCells(const h3Set: Ph3Index; compactedSet: Ph3Index; const numHexes: Int64): Th3Error;
@@ -904,16 +1121,12 @@ begin
   Result:= FisValidVertex(vertex);
 end;
 
-function Th3Api.LatLngToCell(const lat,lng: Double; resolution: Integer; var h: Th3Index): LongBool;
-var g: Th3LatLng; retVal: Th3Error;
+function Th3Api.LatLngToCell(const lat,lng: Double; resolution: Integer; var h: Th3Index): Boolean;
+var g: Th3LatLng;
 begin
   CheckMethod(@@FlatLngToCell);
   g := Th3LatLng.Create(lat,lng);
-  retVal := FlatLngToCell(@g,resolution,@h);
-  if retVal = Th3Error(Th3ErrorCodes.E_SUCCESS) then
-    Result := true
-  else
-    Result := LongBool(retVal);
+  Result := FlatLngToCell(@g,resolution,@h).Succeed;
 end;
 
 procedure Th3Api.LoadApiLibrary;
@@ -1022,6 +1235,11 @@ begin
   Result:= FstringToH3(@buffer[0],@cell);
 end;
 
+function Th3Api.Succeeded(Err: Th3Error): Boolean;
+begin
+  Result := Err.Succeed;
+end;
+
 procedure Th3Api.ThisMethodNotAvailable(const AMethodName: string);
 begin
   raise h3Error.CreateResFmt(@rsErrorH3MethodUnavaible,[Th3Api.ClassName,AMethodName]);
@@ -1055,5 +1273,6 @@ begin
     lng := lat;
   end;
 end;
+{$endregion}
 
 end.
